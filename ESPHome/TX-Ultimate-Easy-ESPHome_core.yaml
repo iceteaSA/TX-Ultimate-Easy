@@ -1243,6 +1243,7 @@ number:
     restore_value: true
 
 ota:
+  platform: esphome
 
 output:
   - id: output_relay_1
