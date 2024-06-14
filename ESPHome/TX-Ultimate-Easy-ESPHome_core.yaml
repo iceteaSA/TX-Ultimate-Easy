@@ -1548,7 +1548,6 @@ switch:
     pin:
       number: GPIO26
       inverted: true
-      allow_other_uses: true
     restore_mode: RESTORE_DEFAULT_ON
     internal: true
     entity_category: config
