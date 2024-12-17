@@ -1710,12 +1710,12 @@ switch:
     output: output_relay_1
     restore_mode: RESTORE_DEFAULT_OFF
     internal: true
-    on_turn_on:
-      then:
-        - script.execute: show_relay_status
-    on_turn_off:
-      then:
-        - script.execute: show_relay_status
+#    on_turn_on:
+#      then:
+#        - script.execute: show_relay_status
+#    on_turn_off:
+#      then:
+#        - script.execute: show_relay_status
 
   - id: sw_relay_2
     name: Relay 2
@@ -1723,12 +1723,12 @@ switch:
     output: output_relay_2
     restore_mode: RESTORE_DEFAULT_OFF
     internal: true
-    on_turn_on:
-      then:
-        - script.execute: show_relay_status
-    on_turn_off:
-      then:
-        - script.execute: show_relay_status
+#    on_turn_on:
+#      then:
+#        - script.execute: show_relay_status
+#    on_turn_off:
+#      then:
+#        - script.execute: show_relay_status
 
   - id: sw_relay_3
     name: Relay 3
@@ -1736,12 +1736,12 @@ switch:
     output: output_relay_3
     restore_mode: RESTORE_DEFAULT_OFF
     internal: true
-    on_turn_on:
-      then:
-        - script.execute: show_relay_status
-    on_turn_off:
-      then:
-        - script.execute: show_relay_status
+#    on_turn_on:
+#      then:
+#        - script.execute: show_relay_status
+#    on_turn_off:
+#      then:
+#        - script.execute: show_relay_status
 
   - id: sw_relay_4
     name: Relay 4
@@ -1749,12 +1749,12 @@ switch:
     output: output_relay_4
     restore_mode: RESTORE_DEFAULT_OFF
     internal: true
-    on_turn_on:
-      then:
-        - script.execute: show_relay_status
-    on_turn_off:
-      then:
-        - script.execute: show_relay_status
+#    on_turn_on:
+#      then:
+#        - script.execute: show_relay_status
+#    on_turn_off:
+#      then:
+#        - script.execute: show_relay_status
 
   - id: sw_touch_panel_power
     name: Touch panel - Power
