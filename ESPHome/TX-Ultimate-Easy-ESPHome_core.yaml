@@ -314,7 +314,7 @@ esphome:
                   id(gb_lights_2) = { light_eu_rl_1_3_top, light_eu_rl_2_3_top, light_eu_rl_3_3_top };
                 }
                 break;
-              case 4:  // 3 Gang
+              case 4:  // 4 Gang
                 if (us_model) {
                   id(gb_lights_1) = { light_us_rl_1_4_left, light_us_rl_2_4_left, light_us_rl_3_4_left, light_us_rl_4_4_left };
                   id(gb_lights_2) = { light_us_rl_1_4_right, light_us_rl_2_4_right, light_us_rl_3_4_right, light_us_rl_4_4_right };
@@ -330,6 +330,53 @@ esphome:
         - lambda: |-
             tx_fw_version->publish_state("${version}");
             tx_device_name->publish_state("${name}");
+            ESP_LOGD("init", "Initializing light indices and relay configurations");
+            if (sl_tx_model_format == nullptr || sl_tx_model_gang == nullptr) {
+              ESP_LOGE("init", "Model format or gang settings are not initialized");
+              return;
+            }
+            auto model_format = sl_tx_model_format->active_index();
+            auto num_gangs_opt = sl_tx_model_gang->active_index();
+            if (!num_gangs_opt.has_value()) {
+              ESP_LOGE("init", "Number of gangs is not set");
+              return;
+            }
+            int num_gangs = num_gangs_opt.value() + 1; // Convert 0-indexed to count
+
+            std::vector<esphome::select::Select*> relay_modes;
+            if (model_format.has_value() && model_format.value() == 0) {
+              relay_modes = {sl_relay_1_light_mode_eu, sl_relay_2_light_mode_eu, sl_relay_3_light_mode_eu, sl_relay_4_light_mode_eu};
+            } else if (model_format.has_value()) {
+              relay_modes = {sl_relay_1_light_mode_us, sl_relay_2_light_mode_us, sl_relay_3_light_mode_us, sl_relay_4_light_mode_us};
+            } else {
+              ESP_LOGE("init", "Model format is not set");
+              return;
+            }
+
+            // Validate relay modes
+            if (relay_modes.size() < num_gangs) {
+              ESP_LOGW("init", "Relay modes size (%d) does not match configured gangs (%d)", relay_modes.size(), num_gangs);
+              num_gangs = relay_modes.size();
+            }
+
+            id(gb_lights_1).resize(num_gangs, nullptr);
+            id(gb_lights_2).resize(num_gangs, nullptr);
+            id(light_config).clear();
+
+            for (int i = 0; i < num_gangs; ++i) {
+              if (i < relay_modes.size() && relay_modes[i] != nullptr) {
+                auto light_index = relay_modes[i]->active_index();
+                if (light_index.has_value()) {
+                  id(light_config).push_back(light_index.value());
+                } else {
+                  id(light_config).push_back(0); // Default to 0 if no light index
+                }
+              } else {
+                id(light_config).push_back(0); // Default to 0 if out of range
+              }
+            }
+            ESP_LOGD("init", "Light configuration initialized: %d gangs", num_gangs);
+
     - priority: -100  # At this priority, pretty much everything should already be initialized.
       then:
         - lambda: send_event_to_ha->execute("boot", "done");
@@ -346,6 +393,9 @@ globals:
   - id: gb_lights_2
     type: std::vector<light::LightState*>
     restore_value: false
+  - id: light_config
+    type: std::vector<uint8_t>
+    initial_value: "std::vector<uint8_t>()"
 
 i2s_audio:
   id: if_i2s_audio
@@ -1308,37 +1358,31 @@ script:
     mode: restart
     then:
       - lambda: |-
-          return;
-          show_relay_status->stop();
-          auto model_format = sl_tx_model_format->active_index();
-          std::vector<esphome::select::Select*> relay_modes;
-
-          if (model_format.has_value() and model_format.value() == 0) {
-            relay_modes = {sl_relay_1_light_mode_eu, sl_relay_2_light_mode_eu, sl_relay_3_light_mode_eu, sl_relay_4_light_mode_eu};
-          } else {
-            relay_modes = {sl_relay_1_light_mode_us, sl_relay_2_light_mode_us, sl_relay_3_light_mode_us, sl_relay_4_light_mode_us};
+          ESP_LOGD("show_relay_status", "Script started");
+          if (id(light_config).empty()) {
+            ESP_LOGE("show_relay_status", "Light configuration not initialized");
+            return;
           }
 
-          std::vector<switch_::Switch*> switches = {sw_relay_1, sw_relay_2, sw_relay_3, sw_relay_4};
-          for (int i = 0; i < relay_modes.size(); ++i) {
-            auto light_index = relay_modes[i]->active_index();
-            if (light_index.has_value()) {
-              uint8_t light_idx = light_index.value();
-              bool switch_state = switches[i]->state;
-              if (light_idx == 1 || light_idx == 3) {
-                if (switch_state)
-                  id(gb_lights_1)[i]->turn_on().perform();
-                else
-                  id(gb_lights_1)[i]->turn_off().perform();
+          static std::vector<switch_::Switch*> switches = {sw_relay_1, sw_relay_2, sw_relay_3, sw_relay_4};
+
+          for (size_t i = 0; i < id(light_config).size() && i < switches.size(); ++i) {
+            if (!switches[i]) continue;
+            uint8_t light_idx = id(light_config)[i];
+            bool switch_state = switches[i]->state;
+
+            if (light_idx == 1 || light_idx == 3) {
+              if (id(gb_lights_1).size() > i && id(gb_lights_1)[i] != nullptr) {
+                id(gb_lights_1)[i]->make_call().set_state(switch_state).perform();
               }
-              if (light_idx == 2 || light_idx == 3) {
-                if (switch_state)
-                  id(gb_lights_2)[i]->turn_on().perform();
-                else
-                  id(gb_lights_2)[i]->turn_off().perform();
+            }
+            if (light_idx == 2 || light_idx == 3) {
+              if (id(gb_lights_2).size() > i && id(gb_lights_2)[i] != nullptr) {
+                id(gb_lights_2)[i]->make_call().set_state(switch_state).perform();
               }
             }
           }
+          ESP_LOGD("show_relay_status", "Script completed successfully");
 
   - id: vibrate
     mode: restart
